@@ -87,14 +87,17 @@ if upl:
     st.subheader('Info Data')
     st.write(df.head())
 
-    # Unggah kamus kata positif dan negatif dalam format .txt
+    # Unggah kamus kata positif dan negatif
     st.subheader('Unggah Kamus Kata Positif (Format .txt)')
     pos = st.file_uploader('Positive Lexicon', key='positive', type=['txt'])
 
     st.subheader('Unggah Kamus Kata Negatif (Format .txt)')
     neg = st.file_uploader('Negatif Lexicon', key='negative', type=['txt'])
 
-    if pos and neg:
+    # Periksa apakah kamus lexicon sudah diunggah
+    if not pos or not neg:
+        st.warning('Harap unggah kedua kamus lexicon (positif dan negatif) untuk melanjutkan.')
+    else:
         # Membaca dan memproses kamus lexicon
         list_positive = [line.strip() for line in pos.read().decode('utf-8').splitlines()]
         list_negative = [line.strip() for line in neg.read().decode('utf-8').splitlines()]
@@ -117,7 +120,7 @@ if upl:
         X_combined = np.hstack((X_tfidf.toarray(), X_polarity))
 
         # Target variabel
-        y = df_clean['polaritas']
+        y = df_clean['polaritas'].map({'positif': 0, 'netral': 1, 'negatif': 2})
 
         # Inisialisasi dan pelatihan model Naive Bayes (Multinomial)
         nb_classifier = MultinomialNB()
@@ -126,14 +129,18 @@ if upl:
         # Prediksi sentimen menggunakan Naive Bayes
         y_pred_nb = nb_classifier.predict(X_combined)
 
+        # Map hasil prediksi angka ke label sentimen
+        sentiment_labels = {0: 'positif', 1: 'netral', 2: 'negatif'}
+        y_pred_labels = [sentiment_labels[pred] for pred in y_pred_nb]
+
         # Hitung akurasi
         accuracy = accuracy_score(y, y_pred_nb)
         st.write(f"Akurasi Model Naive Bayes: {accuracy:.2f}")
 
         # Pie chart untuk distribusi prediksi
-        pred_counts = pd.Series(y_pred_nb).value_counts()
+        pred_counts = pd.Series(y_pred_labels).value_counts()
         labels = ['positif', 'netral', 'negatif']
-        sizes = [pred_counts.get('positif', 0), pred_counts.get('netral', 0), pred_counts.get('negatif', 0)]
+        sizes = [pred_counts.get(label, 0) for label in labels]
         colors = ['#008000', '#FFFF00', '#FF0000']  # Hijau, Kuning, Merah
         explode = [0.05] * len(labels)
         fig1, ax1 = plt.subplots()
@@ -142,18 +149,28 @@ if upl:
         ax1.axis('equal')
         st.pyplot(fig1)
 
+        # Tabel distribusi count
+        st.subheader('Distribusi Count Prediksi Sentimen')
+
+        sentiment_counts = pd.Series(y_pred_labels).value_counts().reindex(labels, fill_value=0)
+        sentiment_counts_df = sentiment_counts.reset_index()
+        sentiment_counts_df.columns = ['Sentimen', 'Count']
+
+        # Menampilkan tabel distribusi count dengan tampilan default
+        st.table(sentiment_counts_df)
+
         # Menggabungkan semua informasi ke dalam satu DataFrame
         df_results = pd.concat([df[['user', 'produk', 'review']],
                                 pd.Series(df_clean['Tokenizing'], name='Tokenizing'),
                                 pd.Series(df_clean['skor_polaritas'], name='Skor Polaritas'),
                                 pd.Series(df_clean['polaritas'], name='Sentiment Lexicon'),
-                                pd.Series(y_pred_nb, name='Predicted Sentiment')], axis=1)
+                                pd.Series(y_pred_labels, name='Predicted Sentiment')], axis=1)
         
         # Menampilkan data hasil prediksi
         st.write('Data Hasil Prediksi:')
         st.write(df_results)
 
-        # Word Cloud berdasarkan hasil prediksi
+         # Word Cloud berdasarkan hasil prediksi
         positive_reviews = df_clean[df_clean['polaritas'] == 'positif']
         negative_reviews = df_clean[df_clean['polaritas'] == 'negatif']
 
@@ -175,6 +192,7 @@ if upl:
         st.subheader("WordCloud Ulasan Negatif")
         st.pyplot(fig3)
 
+        
         @st.cache_data
         def convert_df(df):
             return df.to_csv(index=False)
@@ -182,8 +200,9 @@ if upl:
         csv = convert_df(df_results)
 
         st.download_button(
-            label="Unduh Data Hasil Prediksi",
+            label="Unduh Data Hasil analisis",
             data=csv,
             file_name='data_hasil_prediksi.csv',
             mime='text/csv'
         )
+
