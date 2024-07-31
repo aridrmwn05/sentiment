@@ -3,6 +3,6 @@ scikit-learn==1.3.2
 numpy==1.26.4
 matplotlib==3.8.2
 wordcloud==1.9.3
-streamlit==1.36.0
+streamlit==1.36.0  
 nltk==3.8.1
-nlp-id==0.1.11
+nlp-id
